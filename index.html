@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Portfolio — Photography</title>
+    <title>Alex Suero</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -16,8 +16,8 @@
         --fg: #111111;
         --muted: #5c5c5c;
         --line: rgba(17, 17, 17, 0.08);
-        --max: 1120px;
-        --gap: clamp(1rem, 3vw, 1.75rem);
+        --max: min(1680px, 100vw - 2rem);
+        --gap: clamp(0.45rem, 1.5vw, 0.75rem);
       }
 
       *,
@@ -45,7 +45,7 @@
       .page {
         max-width: var(--max);
         margin: 0 auto;
-        padding: clamp(1rem, 3vw, 1.75rem) clamp(1.25rem, 5vw, 2.5rem)
+        padding: clamp(1rem, 3vw, 1.75rem) clamp(0.75rem, 2.5vw, 1.25rem)
           clamp(4rem, 12vw, 7rem);
       }
 
@@ -76,6 +76,7 @@
       .lede {
         margin: 0;
         max-width: 32em;
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
         font-size: clamp(0.6875rem, 1.05vw, 0.75rem);
         font-weight: 300;
         color: var(--fg);
@@ -225,19 +226,19 @@
         <div class="gallery__col">
           <figure>
             <img
-              src="https://picsum.photos/seed/portfolio-a1/800/1067"
+              src="images/01.jpg"
               alt=""
-              width="800"
-              height="1067"
+              width="1200"
+              height="1600"
               loading="lazy"
             />
           </figure>
           <figure class="landscape">
             <img
-              src="https://picsum.photos/seed/portfolio-a2/1067/800"
+              src="images/02.jpg"
               alt=""
-              width="1067"
-              height="800"
+              width="1600"
+              height="1200"
               loading="lazy"
             />
           </figure>
@@ -245,19 +246,19 @@
         <div class="gallery__col">
           <figure class="landscape">
             <img
-              src="https://picsum.photos/seed/portfolio-b1/1067/800"
+              src="images/03.jpg"
               alt=""
-              width="1067"
-              height="800"
+              width="1600"
+              height="1200"
               loading="lazy"
             />
           </figure>
           <figure>
             <img
-              src="https://picsum.photos/seed/portfolio-b2/800/1067"
+              src="images/04.JPG"
               alt=""
-              width="800"
-              height="1067"
+              width="1200"
+              height="1600"
               loading="lazy"
             />
           </figure>
@@ -265,19 +266,19 @@
         <div class="gallery__col">
           <figure>
             <img
-              src="https://picsum.photos/seed/portfolio-c1/800/1067"
+              src="images/05.JPG"
               alt=""
-              width="800"
-              height="1067"
+              width="1200"
+              height="1600"
               loading="lazy"
             />
           </figure>
           <figure class="landscape">
             <img
-              src="https://picsum.photos/seed/portfolio-c2/1067/800"
+              src="images/06.jpg"
               alt=""
-              width="1067"
-              height="800"
+              width="1600"
+              height="1200"
               loading="lazy"
             />
           </figure>
@@ -323,18 +324,86 @@
           fig.setAttribute("aria-label", "View image larger");
         });
 
+        function largestSrcsetUrl(srcsetAttr) {
+          if (!srcsetAttr || !srcsetAttr.trim()) return null;
+          let bestUrl = null;
+          let bestW = -1;
+          srcsetAttr.split(",").forEach(function (part) {
+            const bits = part.trim().split(/\s+/);
+            if (!bits.length) return;
+            const url = bits[0];
+            const desc = bits[1] || "";
+            let w = 0;
+            if (desc.endsWith("w")) {
+              w = parseInt(desc.slice(0, -1), 10) || 0;
+            } else if (desc.endsWith("x")) {
+              w = Math.round(1000 * (parseFloat(desc.slice(0, -1)) || 1));
+            }
+            if (w >= bestW) {
+              bestW = w;
+              bestUrl = url;
+            }
+          });
+          return bestUrl;
+        }
+
+        function lightboxUrlCandidates(fromImg) {
+          const out = [];
+          const push = function (u) {
+            if (u && out.indexOf(u) === -1) out.push(u);
+          };
+
+          push(fromImg.getAttribute("data-full"));
+
+          const srcAttr = fromImg.getAttribute("src") || "";
+          if (srcAttr.indexOf("/") !== -1) {
+            push(srcAttr.replace(/^(.*\/)([^/]+)$/, "$1full/$2"));
+          }
+
+          const ss = fromImg.getAttribute("srcset");
+          push(largestSrcsetUrl(ss));
+
+          push(srcAttr);
+          return out;
+        }
+
         function open(fromImg) {
           lastFocus = document.activeElement;
-          lightboxImg.src = fromImg.currentSrc || fromImg.src;
           lightboxImg.alt = fromImg.alt || "";
+
+          const queue = lightboxUrlCandidates(fromImg).filter(Boolean);
+          if (!queue.length) return;
+
+          function clearImgHandlers() {
+            lightboxImg.onload = null;
+            lightboxImg.onerror = null;
+          }
+
+          function tryLoad(i) {
+            clearImgHandlers();
+            if (i >= queue.length) return;
+            lightboxImg.onload = clearImgHandlers;
+            lightboxImg.onerror = function () {
+              clearImgHandlers();
+              tryLoad(i + 1);
+            };
+            if ("fetchPriority" in lightboxImg) {
+              lightboxImg.fetchPriority = "high";
+            }
+            lightboxImg.src = queue[i];
+          }
+
           lightbox.hidden = false;
           document.body.style.overflow = "hidden";
           if (page) page.setAttribute("inert", "");
           closeBtn.focus();
+          tryLoad(0);
         }
 
         function close() {
           lightbox.hidden = true;
+          lightboxImg.onload = null;
+          lightboxImg.onerror = null;
           lightboxImg.removeAttribute("src");
           lightboxImg.alt = "";
           document.body.style.overflow = "";
